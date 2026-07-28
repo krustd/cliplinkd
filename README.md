@@ -1,21 +1,12 @@
 # ClipLink Daemon
 
-**`cliplinkd`** — 桌面端守护进程，接收来自手机 ClipLink APP 的文本，自动写入剪贴板并在聚焦输入框时粘贴。
+**`cliplinkd`** — 桌面端守护进程，接收来自手机 ClipLink APP 的文本，自动写入剪贴板并粘贴。
 
 ## 特性
 
-- **零配置发现**：UDP 广播自动被手机端发现，无需手动输入 IP
+- **多播发现**：224.0.0.167 多播 + Burst 首发，手机自动发现，无需手动输入 IP
 - **PIN 认证**：可选的 PIN 码保护，3 次失败后自动封禁 IP 30 秒
-- **焦点感知粘贴**：检测当前焦点是否为输入框，是则自动 `Ctrl/Cmd+V`，否则仅写剪贴板并回传状态
-- **跨平台焦点检测**：
-
-| 平台 | 检测方式 |
-|------|---------|
-| macOS | AXUIElement Accessibility API |
-| Linux X11 | XGetInputFocus + XGetClassHint |
-| Linux Wayland | AT-SPI2 via D-Bus |
-| Windows | GetGUIThreadInfo + UIAutomation |
-
+- **自动粘贴**：收到文本后直接 `Ctrl/Cmd+V`，不猜焦点、不判断是否能贴
 - **极低资源占用**：Rust 编写，release 二进制约 1.2 MB，空闲 CPU < 0.1%，内存 < 15 MB
 
 ## 安装
@@ -32,8 +23,8 @@ cargo install krust-cliplinkd
 
 从 [Releases](https://github.com/krustd/cliplinkd/releases) 下载预编译二进制：
 
-- `cliplinkd-x86_64-apple-darwin` — macOS Intel
 - `cliplinkd-aarch64-apple-darwin` — macOS Apple Silicon
+- `cliplinkd-x86_64-apple-darwin` — macOS Intel
 - `cliplinkd-x86_64-unknown-linux-gnu` — Linux
 - `cliplinkd-x86_64-pc-windows-msvc.exe` — Windows
 
@@ -63,7 +54,21 @@ cliplinkd init
 
 ### 手动编辑
 
-配置文件搜索路径（优先级从高到低）：
+配置文件加载顺序（优先级从高到低）：
+
+1. `~/.config/cliplinkd/cliplinkd.toml`
+2. `./cliplinkd.toml`（本地覆盖）
+
+```toml
+[server]
+bind = "0.0.0.0"    # 监听地址
+port = 9527          # TCP 端口（UDP 发现端口 = port + 1）
+
+[auth]
+pin = "123456"       # PIN 码；留空则跳过认证
+
+[service]
+name = "My Computer" # 手机端显示的设备名，默认取 hostname
 ```
 
 ## 运行
@@ -72,16 +77,13 @@ cliplinkd init
 # 前台运行
 cliplinkd
 
-# 使用自定义配置
-cliplinkd --config /path/to/config.toml
-
 # 设置日志级别
 RUST_LOG=debug cliplinkd
 ```
 
 ### 开机自启
 
-**macOS** — 创建 LaunchAgent：
+**macOS** — LaunchAgent：
 
 ```xml
 <!-- ~/Library/LaunchAgents/com.cliplink.daemon.plist -->
@@ -130,32 +132,20 @@ systemctl --user enable --now cliplinkd.service
 
 ## 协议
 
-详见 `cliplinkd.toml` 和源码 `src/session.rs`。通信格式为 JSON over TCP，`\n` 分隔。
+通信格式为 JSON over TCP，`\n` 分隔。
 
 | 方向 | 消息 | 说明 |
 |------|------|------|
 | 手机→电脑 | `{"type":"auth","pin":"...","device_name":"..."}` | 认证 |
-| 电脑→手机 | `{"type":"auth_ok"}` | 认证成功 |
-| 电脑→手机 | `{"type":"auth_fail","message":"..."}` | 认证失败 |
+| 电脑→手机 | `{"type":"auth_ok","name":"..."}` | 认证成功（含设备名） |
+| 电脑→手机 | `{"type":"auth_fail","name":"...","message":"..."}` | 认证失败（含设备名） |
 | 手机→电脑 | `{"type":"send","payload":"...","id":"uuid"}` | 发送文本 |
-| 电脑→手机 | `{"type":"ack","id":"uuid","status":"pasted"}` | 已粘贴 |
-| 电脑→手机 | `{"type":"ack","id":"uuid","status":"clipboard_only"}` | 仅写剪贴板 |
-| 电脑→手机 | `{"type":"nack","id":"uuid","status":"no_focus","message":"..."}` | 无聚焦输入框 |
+| 电脑→手机 | `{"type":"ack","id":"uuid","status":"sent"}` | 已发送 |
+| 电脑→手机 | `{"type":"nack","id":"uuid","status":"error","message":"..."}` | 发送失败 |
 | 手机→电脑 | `{"type":"ping"}` | 心跳 |
 | 电脑→手机 | `{"type":"pong"}` | 心跳响应 |
 
-UDP 发现：手机广播 `{"type":"discover"}` 到 `port+1`，电脑响应 `{"type":"announce","name":"...","tcp_port":9527}`。
-
-## 权限要求
-
-| 平台 | 权限 | 说明 |
-|------|------|------|
-| macOS | 辅助功能权限 | 系统设置 → 隐私与安全性 → 辅助功能，添加终端或 cliplinkd |
-| Linux X11 | 无 | — |
-| Linux Wayland | AT-SPI2 总线 | 大多数桌面环境默认启用 |
-| Windows | 无 | — |
-
-若未授权辅助功能权限（macOS），焦点检测退化为 `None`，仅写入剪贴板不自动粘贴。
+UDP 多播发现：手机发送 `{"type":"discover"}` 到 `224.0.0.167:port+1`，电脑响应 `{"type":"announce","name":"...","tcp_port":9527}`。
 
 ## 许可
 
