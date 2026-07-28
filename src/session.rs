@@ -236,5 +236,6 @@ async fn send_json(
     let mut data = serde_json::to_vec(value)?;
     data.push(b'\n');
     writer.write_all(&data).await?;
+    writer.flush().await?;
     Ok(())
 }
