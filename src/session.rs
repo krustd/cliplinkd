@@ -201,19 +201,20 @@ pub async fn handle(
                     continue;
                 }
                 // Write to clipboard, then always attempt paste
-                let response = match paste::simulate_paste() {
+                match paste::simulate_paste() {
                     Ok(()) => {
                         tracing::info!("[{}] pasted", addr);
-                        serde_json::json!({"type":"ack","id":id,"status":"pasted"})
+                        send_json(&mut writer, &serde_json::json!({"type":"ack","id":id,"status":"pasted"})).await?;
                     }
                     Err(e) => {
                         tracing::warn!("[{}] paste failed: {}", addr, e);
-                        serde_json::json!({
+                        send_json(&mut writer, &serde_json::json!({
                             "type":"nack","id":id,"status":"paste_error",
                             "message":format!("粘贴失败: {}", e)
-                        })
+                        })).await?;
                     }
-                };
+                }
+                continue;
             }
 
             "ping" => {
