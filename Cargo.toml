@@ -1,11 +1,17 @@
 [package]
-name = "cliplinkd"
+name = "krust-cliplinkd"
 version = "0.1.0"
 edition = "2021"
 description = "ClipLink daemon — receive text from mobile and auto-paste on desktop"
 license = "MIT"
 repository = "https://github.com/krustd/cliplinkd"
 readme = "README.md"
+keywords = ["clipboard", "paste", "lan", "desktop", "mobile"]
+categories = ["command-line-utilities", "network-programming"]
+
+[[bin]]
+name = "cliplinkd"
+path = "src/main.rs"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }

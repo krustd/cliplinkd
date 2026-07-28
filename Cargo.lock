@@ -261,30 +261,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cliplinkd"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arboard",
- "core-foundation",
- "dirs",
- "enigo",
- "hostname",
- "objc2 0.5.2",
- "objc2-foundation 0.2.2",
- "serde",
- "serde_json",
- "tokio",
- "toml",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "windows 0.58.0",
- "x11",
- "zbus",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -725,6 +701,30 @@ dependencies = [
  "cfg-if",
  "futures-util",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "krust-cliplinkd"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arboard",
+ "core-foundation",
+ "dirs",
+ "enigo",
+ "hostname",
+ "objc2 0.5.2",
+ "objc2-foundation 0.2.2",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "windows 0.58.0",
+ "x11",
+ "zbus",
 ]
 
 [[package]]
