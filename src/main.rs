@@ -1,3 +1,4 @@
+mod focus;
 mod clipboard;
 mod config;
 mod discovery;

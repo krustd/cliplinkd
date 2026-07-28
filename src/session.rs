@@ -1,3 +1,4 @@
+use crate::focus;
 use crate::clipboard;
 use crate::config::Config;
 use crate::paste;
@@ -200,11 +201,16 @@ pub async fn handle(
                     .await?;
                     continue;
                 }
-                // Write to clipboard, then always attempt paste
+                // Always paste — focus only affects status message
                 match paste::simulate_paste() {
                     Ok(()) => {
-                        tracing::info!("[{}] pasted", addr);
-                        send_json(&mut writer, &serde_json::json!({"type":"ack","id":id,"status":"pasted"})).await?;
+                        if focus::is_focused_input() {
+                            tracing::info!("[{}] pasted", addr);
+                            send_json(&mut writer, &serde_json::json!({"type":"ack","id":id,"status":"pasted"})).await?;
+                        } else {
+                            tracing::info!("[{}] pasted but focus not an input", addr);
+                            send_json(&mut writer, &serde_json::json!({"type":"nack","id":id,"status":"no_focus","message":"当前焦点不是输入框"})).await?;
+                        }
                     }
                     Err(e) => {
                         tracing::warn!("[{}] paste failed: {}", addr, e);
@@ -214,7 +220,6 @@ pub async fn handle(
                         })).await?;
                     }
                 }
-                continue;
             }
 
             "ping" => {
