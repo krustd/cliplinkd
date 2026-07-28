@@ -1,7 +1,6 @@
 mod clipboard;
 mod config;
 mod discovery;
-mod focus;
 mod paste;
 mod server;
 mod session;

@@ -1,6 +1,5 @@
 use crate::clipboard;
 use crate::config::Config;
-use crate::focus;
 use crate::paste;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -201,31 +200,20 @@ pub async fn handle(
                     .await?;
                     continue;
                 }
-
-                // Step 2: Check focus and paste
-                let response = if focus::is_focused_input() {
-                    match paste::simulate_paste() {
-                        Ok(()) => {
-                            tracing::info!("[{}] pasted", addr);
-                            serde_json::json!({"type":"ack","id":id,"status":"pasted"})
-                        }
-                        Err(e) => {
-                            tracing::warn!("[{}] paste failed: {}", addr, e);
-                            serde_json::json!({
-                                "type":"nack","id":id,"status":"paste_error",
-                                "message":format!("粘贴失败: {}", e)
-                            })
-                        }
+                // Write to clipboard, then always attempt paste
+                let response = match paste::simulate_paste() {
+                    Ok(()) => {
+                        tracing::info!("[{}] pasted", addr);
+                        serde_json::json!({"type":"ack","id":id,"status":"pasted"})
                     }
-                } else {
-                    tracing::info!("[{}] focus not an input", addr);
-                    serde_json::json!({
-                        "type":"nack","id":id,"status":"no_focus",
-                        "message":"当前焦点不是输入框"
-                    })
+                    Err(e) => {
+                        tracing::warn!("[{}] paste failed: {}", addr, e);
+                        serde_json::json!({
+                            "type":"nack","id":id,"status":"paste_error",
+                            "message":format!("粘贴失败: {}", e)
+                        })
+                    }
                 };
-
-                send_json(&mut writer, &response).await?;
             }
 
             "ping" => {
