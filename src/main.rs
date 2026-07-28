@@ -6,10 +6,17 @@ mod paste;
 mod server;
 mod session;
 
+use std::io::{self, Write};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Check for subcommands before starting the daemon
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && args[1] == "init" {
+        return run_init();
+    }
+
     // Initialize structured logging
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -19,7 +26,6 @@ async fn main() -> anyhow::Result<()> {
         .with_target(false)
         .init();
 
-    // Load configuration
     let config = config::Config::load()?;
 
     tracing::info!(
@@ -36,7 +42,6 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!("No PIN configured — any device can connect without authentication");
     }
 
-    // Spawn UDP discovery service
     let disc_config = config.clone();
     tokio::spawn(async move {
         if let Err(e) = discovery::run(disc_config).await {
@@ -44,7 +49,6 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // Run TCP server (blocks until SIGINT/SIGTERM)
     tokio::select! {
         result = server::run(config) => {
             if let Err(e) = result {
@@ -59,7 +63,72 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Wait for a SIGINT (Ctrl+C) or SIGTERM signal.
+/// Interactive configuration wizard.
+fn run_init() -> anyhow::Result<()> {
+    println!();
+    println!("  ╔══════════════════════════════════╗");
+    println!("  ║   ClipLink Daemon — Setup       ║");
+    println!("  ╚══════════════════════════════════╝");
+    println!();
+
+    let mut config = config::Config::default();
+
+    // Service name
+    print!("  Service name [{}]: ", config.service.name);
+    io::stdout().flush()?;
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let name = input.trim().to_string();
+    if !name.is_empty() {
+        config.service.name = name;
+    }
+
+    // PIN
+    print!("  PIN code [{}]: ", config.auth.pin);
+    io::stdout().flush()?;
+    input.clear();
+    io::stdin().read_line(&mut input)?;
+    let pin = input.trim().to_string();
+    if !pin.is_empty() {
+        config.auth.pin = pin;
+    }
+
+    // Port
+    print!("  TCP port [{}]: ", config.server.port);
+    io::stdout().flush()?;
+    input.clear();
+    io::stdin().read_line(&mut input)?;
+    if let Ok(port) = input.trim().parse::<u16>() {
+        config.server.port = port;
+    }
+
+    // Summary
+    println!();
+    println!("  ──────────────────────────────────");
+    println!("  Service name : {}", config.service.name);
+    println!("  PIN          : {}", if config.auth.pin.is_empty() { "(none — insecure!)" } else { &config.auth.pin });
+    println!("  TCP port     : {} (UDP discovery: {})", config.server.port, config.server.port + 1);
+    println!("  ──────────────────────────────────");
+    println!();
+
+    print!("  Save? [Y/n]: ");
+    io::stdout().flush()?;
+    input.clear();
+    io::stdin().read_line(&mut input)?;
+    if input.trim().to_lowercase() == "n" {
+        println!("  Aborted.");
+        return Ok(());
+    }
+
+    let path = config.save()?;
+    println!("  ✓ Configuration saved to {}", path.display());
+    println!();
+    println!("  Run 'cliplinkd' to start the daemon.");
+    println!();
+
+    Ok(())
+}
+
 async fn shutdown_signal() {
     tokio::signal::ctrl_c()
         .await

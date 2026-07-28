@@ -112,4 +112,16 @@ impl Config {
         tracing::info!("No config file found, using defaults");
         Ok(Config::default())
     }
+
+    /// Write config to the standard user config path.
+    pub fn save(&self) -> anyhow::Result<PathBuf> {
+        let dir = dirs::config_dir()
+            .unwrap_or_default()
+            .join("cliplinkd");
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join("cliplinkd.toml");
+        let content = toml::to_string_pretty(self)?;
+        std::fs::write(&path, content)?;
+        Ok(path)
+    }
 }
