@@ -202,45 +202,27 @@ pub async fn handle(
                     continue;
                 }
 
-                // Step 2: Check focus and optionally paste
-                let response = match focus::is_focused_input() {
-                    Some(true) => {
-                        match paste::simulate_paste() {
-                            Ok(()) => {
-                                tracing::info!("[{}] pasted into focused input", addr);
-                                serde_json::json!({
-                                    "type": "ack",
-                                    "id": id,
-                                    "status": "pasted"
-                                })
-                            }
-                            Err(e) => {
-                                tracing::warn!("[{}] paste simulation failed: {}", addr, e);
-                                serde_json::json!({
-                                    "type": "ack",
-                                    "id": id,
-                                    "status": "clipboard_only"
-                                })
-                            }
+                // Step 2: Check focus and paste
+                let response = if focus::is_focused_input() {
+                    match paste::simulate_paste() {
+                        Ok(()) => {
+                            tracing::info!("[{}] pasted", addr);
+                            serde_json::json!({"type":"ack","id":id,"status":"pasted"})
+                        }
+                        Err(e) => {
+                            tracing::warn!("[{}] paste failed: {}", addr, e);
+                            serde_json::json!({
+                                "type":"nack","id":id,"status":"paste_error",
+                                "message":format!("粘贴失败: {}", e)
+                            })
                         }
                     }
-                    Some(false) => {
-                        tracing::info!("[{}] focus is not an input — clipboard only", addr);
-                        serde_json::json!({
-                            "type": "ack",
-                            "id": id,
-                            "status": "clipboard_only"
-                        })
-                    }
-                    None => {
-                        tracing::info!("[{}] no focused input detected", addr);
-                        serde_json::json!({
-                            "type": "nack",
-                            "id": id,
-                            "status": "no_focus",
-                            "message": "当前没有聚焦的输入框"
-                        })
-                    }
+                } else {
+                    tracing::info!("[{}] focus not an input", addr);
+                    serde_json::json!({
+                        "type":"nack","id":id,"status":"no_focus",
+                        "message":"当前焦点不是输入框"
+                    })
                 };
 
                 send_json(&mut writer, &response).await?;
