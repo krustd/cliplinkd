@@ -23,8 +23,10 @@
 ### crates.io
 
 ```bash
-cargo install cliplinkd
+cargo install krust-cliplinkd
 ```
+
+安装后二进制文件名为 `cliplinkd`。
 
 ### GitHub Releases
 
