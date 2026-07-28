@@ -101,13 +101,13 @@ impl Config {
     }
 
     /// Load config from the first found path:
-    ///   1. ./cliplinkd.toml
-    ///   2. ~/.config/cliplinkd/cliplinkd.toml
+    ///   1. ~/.config/cliplinkd/cliplinkd.toml  (user config)
+    ///   2. ./cliplinkd.toml                     (local override)
     /// Falls back to defaults if none found.
     pub fn load() -> anyhow::Result<Self> {
         let paths: Vec<PathBuf> = vec![
-            PathBuf::from("cliplinkd.toml"),
             Self::config_dir().join("cliplinkd.toml"),
+            PathBuf::from("cliplinkd.toml"),
         ];
 
         for path in &paths {
