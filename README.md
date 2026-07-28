@@ -48,21 +48,22 @@ cargo build --release
 
 ## 配置
 
-首次运行时自动生成默认配置。配置文件搜索路径（优先级从高到低）：
+### 快速设置（推荐）
 
-1. `./cliplinkd.toml`
-2. `~/.config/cliplinkd/cliplinkd.toml`
+```bash
+cliplinkd init
+```
 
-```toml
-[server]
-bind = "0.0.0.0"    # 监听地址
-port = 9527          # TCP 端口（UDP 发现端口 = port + 1）
+交互式向导，依次设置：
+- **Service name** — 手机端显示的设备名（默认取 hostname）
+- **PIN code** — 认证密码，留空则不验证
+- **TCP port** — 监听端口（默认 9527，UDP 发现端口自动为 port + 1）
 
-[auth]
-pin = "123456"       # PIN 码；留空则跳过认证
+配置保存在 `~/.config/cliplinkd/cliplinkd.toml`。
 
-[service]
-name = "My Computer" # mDNS 广播名称，默认取 hostname
+### 手动编辑
+
+配置文件搜索路径（优先级从高到低）：
 ```
 
 ## 运行
