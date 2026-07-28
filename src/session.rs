@@ -1,4 +1,3 @@
-use crate::focus;
 use crate::clipboard;
 use crate::config::Config;
 use crate::paste;
@@ -202,21 +201,17 @@ pub async fn handle(
                     continue;
                 }
                 // Always paste — focus only affects status message
+                // Write to clipboard and paste — always report success
                 match paste::simulate_paste() {
                     Ok(()) => {
-                        if focus::is_focused_input() {
-                            tracing::info!("[{}] pasted", addr);
-                            send_json(&mut writer, &serde_json::json!({"type":"ack","id":id,"status":"pasted"})).await?;
-                        } else {
-                            tracing::info!("[{}] pasted but focus not an input", addr);
-                            send_json(&mut writer, &serde_json::json!({"type":"nack","id":id,"status":"no_focus","message":"当前焦点不是输入框"})).await?;
-                        }
+                        tracing::info!("[{}] sent", addr);
+                        send_json(&mut writer, &serde_json::json!({"type":"ack","id":id,"status":"sent"})).await?;
                     }
                     Err(e) => {
-                        tracing::warn!("[{}] paste failed: {}", addr, e);
+                        tracing::warn!("[{}] paste simulation failed: {}", addr, e);
                         send_json(&mut writer, &serde_json::json!({
-                            "type":"nack","id":id,"status":"paste_error",
-                            "message":format!("粘贴失败: {}", e)
+                            "type":"nack","id":id,"status":"error",
+                            "message":format!("发送失败: {}", e)
                         })).await?;
                     }
                 }
