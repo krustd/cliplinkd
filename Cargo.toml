@@ -1,6 +1,6 @@
 [package]
 name = "krust-cliplinkd"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "ClipLink daemon — receive text from mobile and auto-paste on desktop"
 license = "MIT"
