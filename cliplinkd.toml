@@ -1,0 +1,17 @@
+# ClipLink Daemon Configuration
+# Place this file at ~/.config/cliplinkd/cliplinkd.toml or ./cliplinkd.toml
+
+[server]
+# IP address to bind to (0.0.0.0 = all interfaces)
+bind = "0.0.0.0"
+# TCP port for incoming connections
+port = 9527
+
+[auth]
+# PIN code for device authentication (empty = no auth required)
+pin = "123456"
+
+[service]
+# Name shown to mobile devices during discovery
+# (default: system hostname)
+name = "My Computer"
