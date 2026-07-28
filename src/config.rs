@@ -83,6 +83,23 @@ impl Default for Config {
 }
 
 impl Config {
+    /// User config directory under $HOME/.config/cliplinkd/
+    fn config_dir() -> PathBuf {
+        #[cfg(target_os = "windows")]
+        {
+            dirs::config_dir()
+                .unwrap_or_default()
+                .join("cliplinkd")
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            dirs::home_dir()
+                .unwrap_or_default()
+                .join(".config")
+                .join("cliplinkd")
+        }
+    }
+
     /// Load config from the first found path:
     ///   1. ./cliplinkd.toml
     ///   2. ~/.config/cliplinkd/cliplinkd.toml
@@ -90,10 +107,7 @@ impl Config {
     pub fn load() -> anyhow::Result<Self> {
         let paths: Vec<PathBuf> = vec![
             PathBuf::from("cliplinkd.toml"),
-            dirs::config_dir()
-                .unwrap_or_default()
-                .join("cliplinkd")
-                .join("cliplinkd.toml"),
+            Self::config_dir().join("cliplinkd.toml"),
         ];
 
         for path in &paths {
@@ -113,11 +127,9 @@ impl Config {
         Ok(Config::default())
     }
 
-    /// Write config to the standard user config path.
+    /// Write config to ~/.config/cliplinkd/cliplinkd.toml
     pub fn save(&self) -> anyhow::Result<PathBuf> {
-        let dir = dirs::config_dir()
-            .unwrap_or_default()
-            .join("cliplinkd");
+        let dir = Self::config_dir();
         std::fs::create_dir_all(&dir)?;
         let path = dir.join("cliplinkd.toml");
         let content = toml::to_string_pretty(self)?;
