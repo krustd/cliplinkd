@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "ClipLink daemon — receive text from mobile and auto-paste on desktop"
 license = "MIT"
-repository = "https://github.com/user/cliplink"
+repository = "https://github.com/krustd/cliplinkd"
 readme = "README.md"
 
 [dependencies]
