@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
         config.server.port
     );
     if config.auth.pin.is_empty() {
-        tracing::warn!("No PIN configured — any device can connect without authentication");
+        tracing::warn!("No PIN configured — run 'cliplinkd init' to set one, or any device can connect");
     }
 
     let disc_config = config.clone();
