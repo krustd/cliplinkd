@@ -36,10 +36,11 @@ pub fn read() -> anyhow::Result<ClipboardContent> {
     let mut clipboard =
         arboard::Clipboard::new().context("Failed to open system clipboard")?;
 
-    // 1. Try text first — most common case
-    if let Ok(text) = clipboard.get_text() {
-        if !text.is_empty() {
-            return Ok(ClipboardContent::Text(text));
+    // 1. Try files first — on macOS, file clipboard also exposes a text
+    //    representation (the filename), so we must check files before text.
+    if let Ok(files) = read_files() {
+        if !files.is_empty() {
+            return Ok(ClipboardContent::Files(files));
         }
     }
 
@@ -53,10 +54,10 @@ pub fn read() -> anyhow::Result<ClipboardContent> {
         });
     }
 
-    // 3. Try files (platform-specific)
-    if let Ok(files) = read_files() {
-        if !files.is_empty() {
-            return Ok(ClipboardContent::Files(files));
+    // 3. Try text last
+    if let Ok(text) = clipboard.get_text() {
+        if !text.is_empty() {
+            return Ok(ClipboardContent::Text(text));
         }
     }
 
@@ -129,11 +130,16 @@ fn read_files_macos() -> anyhow::Result<Vec<FileEntry>> {
             msg_send![objc2::class!(NSMutableArray), arrayWithObject: nsurl_class];
 
         // NSArray<NSURL *> *urls = [pb readObjectsForClasses:classes options:nil];
-        let urls: Retained<AnyObject> = msg_send![
+        // Returns nil when no matching objects found.
+        let urls: Option<Retained<AnyObject>> = msg_send![
             &*pb,
             readObjectsForClasses: &*classes,
             options: std::ptr::null::<AnyObject>()
         ];
+        let urls = match urls {
+            Some(u) => u,
+            None => return Ok(Vec::new()),
+        };
 
         let count: usize = msg_send![&*urls, count];
         let mut entries = Vec::with_capacity(count);
@@ -141,7 +147,11 @@ fn read_files_macos() -> anyhow::Result<Vec<FileEntry>> {
         for i in 0..count {
             let url: Retained<AnyObject> = msg_send![&*urls, objectAtIndex: i];
             // NSString *path = [url path];
-            let path_obj: Retained<AnyObject> = msg_send![&*url, path];
+            let path_obj: Option<Retained<AnyObject>> = msg_send![&*url, path];
+            let path_obj = match path_obj {
+                Some(p) => p,
+                None => continue,
+            };
             // const char *utf8 = [path UTF8String];
             let utf8: *const std::ffi::c_char = msg_send![&*path_obj, UTF8String];
             if !utf8.is_null() {
