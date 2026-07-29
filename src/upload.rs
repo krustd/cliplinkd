@@ -35,6 +35,7 @@ pub struct Upload {
     hasher: Sha256,
     temp_path: PathBuf,
     file: Option<BufWriter<File>>,
+    cleanup_on_drop: bool,
 }
 
 pub struct CompletedUpload {
@@ -82,6 +83,7 @@ impl Upload {
             hasher: Sha256::new(),
             temp_path,
             file: Some(BufWriter::new(file)),
+            cleanup_on_drop: true,
         })
     }
 
@@ -153,6 +155,7 @@ impl Upload {
                 destination
             }
         };
+        self.cleanup_on_drop = false;
 
         Ok(CompletedUpload {
             kind: self.kind,
@@ -164,7 +167,9 @@ impl Upload {
 
 impl Drop for Upload {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.temp_path);
+        if self.cleanup_on_drop {
+            let _ = std::fs::remove_file(&self.temp_path);
+        }
     }
 }
 
@@ -237,7 +242,7 @@ async fn cleanup_old_uploads(root: &Path) {
 
 #[cfg(test)]
 mod tests {
-    use super::{sanitize_filename, Upload, UploadKind};
+    use super::{remove_file, sanitize_filename, Upload, UploadKind};
 
     #[test]
     fn rejects_unsafe_filenames() {
@@ -278,6 +283,29 @@ mod tests {
         upload.write_chunk(0, "YWJj").await.unwrap();
         assert!(upload.finish(3, "not-a-digest").await.is_err());
         assert!(!temp_path.exists());
+    }
+
+    #[tokio::test]
+    async fn keeps_completed_image_until_clipboard_write() {
+        let mut upload = Upload::start(
+            uuid::Uuid::new_v4().to_string(),
+            UploadKind::Image,
+            "cliplinkd-upload-test.png".to_owned(),
+            3,
+            1024,
+        )
+        .await
+        .unwrap();
+        upload.write_chunk(0, "YWJj").await.unwrap();
+        let completed = upload
+            .finish(
+                3,
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            )
+            .await
+            .unwrap();
+        assert!(completed.path.exists());
+        remove_file(&completed.path);
     }
     #[test]
     fn keeps_valid_unicode_filename() {
