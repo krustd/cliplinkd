@@ -4,10 +4,10 @@
 
 ## 特性
 
+- **剪贴板拉取**：手机一键获取电脑剪贴板内容（文本/图片/文件），支持大文件确认和进度条
 - **多播发现**：224.0.0.167 多播 + Burst 首发，手机自动发现，无需手动输入 IP
 - **PIN 认证**：可选的 PIN 码保护，3 次失败后自动封禁 IP 30 秒
-- **自动粘贴**：收到文本后直接 `Ctrl/Cmd+V`，不猜焦点、不判断是否能贴
-- **极低资源占用**：Rust 编写，release 二进制约 1.2 MB，空闲 CPU < 0.1%，内存 < 15 MB
+- **后台运行**：`cliplinkd start` / `stop` 一键启停，不占用终端窗口
 
 ## 安装
 
@@ -69,18 +69,24 @@ pin = "123456"       # PIN 码；留空则跳过认证
 
 [service]
 name = "My Computer" # 手机端显示的设备名，默认取 hostname
-```
 
+[clipboard]
+max_fetch_size = 524288  # 文本自动获取阈值（字节），超过此大小需确认；默认 512KB
+```
 ## 运行
 
 ```bash
-# 前台运行
+# 后台运行（推荐）
+cliplinkd start       # 启动后台守护进程
+cliplinkd stop        # 停止后台守护进程
+cliplinkd status      # 查看运行状态
+
+# 前台运行（调试用）
 cliplinkd
 
 # 设置日志级别
 RUST_LOG=debug cliplinkd
 ```
-
 ### 开机自启
 
 **macOS** — LaunchAgent：
@@ -103,10 +109,6 @@ RUST_LOG=debug cliplinkd
     <true/>
 </dict>
 </plist>
-```
-
-```bash
-launchctl load ~/Library/LaunchAgents/com.cliplink.daemon.plist
 ```
 
 **Linux** — systemd user service：
@@ -147,8 +149,10 @@ systemctl --user enable --now cliplinkd.service
 | 电脑→手机 | `{"type":"nack","id":"uuid","status":"error","message":"..."}` | 按键执行失败 |
 | 手机→电脑 | `{"type":"ping"}` | 心跳 |
 | 电脑→手机 | `{"type":"pong"}` | 心跳响应 |
-
-UDP 多播发现：手机发送 `{"type":"discover"}` 到 `224.0.0.167:port+1`，电脑响应 `{"type":"announce","name":"...","tcp_port":9527}`。
+| 手机→电脑 | `{"type":"clipboard_query"}` | 查询电脑剪贴板 |
+| 电脑→手机 | `{"type":"clipboard_info","content_type":"text\|image\|file\|none",...}` | 剪贴板内容信息 |
+| 手机→电脑 | `{"type":"clipboard_fetch","content_type":"text\|image\|file",...}` | 请求获取内容 |
+| 电脑→手机 | `{"type":"clipboard_data","content_type":"text\|image\|file","payload_base64":"...",...}` | 返回内容数据 |
 
 ## 许可
 
