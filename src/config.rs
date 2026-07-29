@@ -1,7 +1,6 @@
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default)]
@@ -10,6 +9,8 @@ pub struct Config {
     pub auth: AuthConfig,
     #[serde(default)]
     pub service: ServiceConfig,
+    #[serde(default)]
+    pub clipboard: ClipboardConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,6 +27,26 @@ pub struct AuthConfig {
     pub pin: String,
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClipboardConfig {
+    /// Max auto-fetch size in bytes. Text below this threshold is fetched
+    /// without confirmation. Images and files always require confirmation.
+    #[serde(default = "default_max_fetch_size")]
+    pub max_fetch_size: usize,
+}
+
+fn default_max_fetch_size() -> usize {
+    524288 // 512 KB
+}
+
+impl Default for ClipboardConfig {
+    fn default() -> Self {
+        Self {
+            max_fetch_size: default_max_fetch_size(),
+        }
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceConfig {
     #[serde(default = "default_service_name")]
@@ -78,6 +99,7 @@ impl Default for Config {
             server: ServerConfig::default(),
             auth: AuthConfig::default(),
             service: ServiceConfig::default(),
+            clipboard: ClipboardConfig::default(),
         }
     }
 }

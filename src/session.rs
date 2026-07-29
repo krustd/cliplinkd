@@ -1,4 +1,5 @@
 use crate::clipboard;
+use crate::clipboard_read;
 use crate::config::Config;
 use crate::paste;
 use std::collections::HashMap;
@@ -154,6 +155,171 @@ pub async fn handle(
                         send_json(&mut writer, &serde_json::json!({
                             "type":"nack","id":id,"status":"error",
                             "message":format!("发送回车失败: {}", e)
+                        })).await?;
+                    }
+                }
+            }
+            "clipboard_query" => {
+                match clipboard_read::read() {
+                    Ok(clipboard_read::ClipboardContent::Text(text)) => {
+                        send_json(&mut writer, &serde_json::json!({
+                            "type":"clipboard_info",
+                            "content_type":"text",
+                            "size_bytes": text.len()
+                        })).await?;
+                    }
+                    Ok(clipboard_read::ClipboardContent::Image { width, height, rgba }) => {
+                        let png_bytes = match clipboard_read::encode_rgba_to_png(width, height, &rgba) {
+                            Ok(b) => b,
+                            Err(e) => {
+                                send_json(&mut writer, &serde_json::json!({
+                                    "type":"clipboard_info",
+                                    "content_type":"none",
+                                    "error": format!("Failed to encode image: {}", e)
+                                })).await?;
+                                continue;
+                            }
+                        };
+                        send_json(&mut writer, &serde_json::json!({
+                            "type":"clipboard_info",
+                            "content_type":"image",
+                            "size_bytes": png_bytes.len(),
+                            "width": width,
+                            "height": height
+                        })).await?;
+                    }
+                    Ok(clipboard_read::ClipboardContent::Files(files)) => {
+                        let file_list: Vec<serde_json::Value> = files.iter().map(|f| {
+                            serde_json::json!({
+                                "name": f.name,
+                                "size": f.size,
+                            })
+                        }).collect();
+                        send_json(&mut writer, &serde_json::json!({
+                            "type":"clipboard_info",
+                            "content_type":"file",
+                            "files": file_list
+                        })).await?;
+                    }
+                    Ok(clipboard_read::ClipboardContent::None) | Err(_) => {
+                        send_json(&mut writer, &serde_json::json!({
+                            "type":"clipboard_info",
+                            "content_type":"none"
+                        })).await?;
+                    }
+                }
+            }
+            "clipboard_fetch" => {
+                let content_type = msg.get("content_type").and_then(|v| v.as_str()).unwrap_or("");
+                let req_id = msg.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                match content_type {
+                    "text" => {
+                        match clipboard_read::read() {
+                            Ok(clipboard_read::ClipboardContent::Text(text)) => {
+                                send_json(&mut writer, &serde_json::json!({
+                                    "type":"clipboard_data",
+                                    "content_type":"text",
+                                    "payload": text,
+                                    "id": req_id
+                                })).await?;
+                            }
+                            _ => {
+                                send_json(&mut writer, &serde_json::json!({
+                                    "type":"clipboard_data",
+                                    "content_type":"error",
+                                    "message":"剪贴板内容已变化或不可用",
+                                    "id": req_id
+                                })).await?;
+                            }
+                        }
+                    }
+                    "image" => {
+                        match clipboard_read::read() {
+                            Ok(clipboard_read::ClipboardContent::Image { width, height, rgba }) => {
+                                match clipboard_read::encode_rgba_to_png(width, height, &rgba) {
+                                    Ok(png_bytes) => {
+                                        let b64 = clipboard_read::encode_base64(&png_bytes);
+                                        send_json(&mut writer, &serde_json::json!({
+                                            "type":"clipboard_data",
+                                            "content_type":"image",
+                                            "format":"png",
+                                            "payload_base64": b64,
+                                            "width": width,
+                                            "height": height,
+                                            "id": req_id
+                                        })).await?;
+                                    }
+                                    Err(e) => {
+                                        send_json(&mut writer, &serde_json::json!({
+                                            "type":"clipboard_data",
+                                            "content_type":"error",
+                                            "message": format!("图片编码失败: {}", e),
+                                            "id": req_id
+                                        })).await?;
+                                    }
+                                }
+                            }
+                            _ => {
+                                send_json(&mut writer, &serde_json::json!({
+                                    "type":"clipboard_data",
+                                    "content_type":"error",
+                                    "message":"剪贴板内容已变化或不可用",
+                                    "id": req_id
+                                })).await?;
+                            }
+                        }
+                    }
+                    "file" => {
+                        let index = msg.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                        match clipboard_read::read() {
+                            Ok(clipboard_read::ClipboardContent::Files(files)) => {
+                                if let Some(file) = files.get(index) {
+                                    match clipboard_read::read_file_bytes(&file.path) {
+                                        Ok(data) => {
+                                            let b64 = clipboard_read::encode_base64(&data);
+                                            send_json(&mut writer, &serde_json::json!({
+                                                "type":"clipboard_data",
+                                                "content_type":"file",
+                                                "filename": file.name,
+                                                "size": file.size,
+                                                "payload_base64": b64,
+                                                "id": req_id
+                                            })).await?;
+                                        }
+                                        Err(e) => {
+                                            send_json(&mut writer, &serde_json::json!({
+                                                "type":"clipboard_data",
+                                                "content_type":"error",
+                                                "message": format!("读取文件失败: {}", e),
+                                                "id": req_id
+                                            })).await?;
+                                        }
+                                    }
+                                } else {
+                                    send_json(&mut writer, &serde_json::json!({
+                                        "type":"clipboard_data",
+                                        "content_type":"error",
+                                        "message":"文件索引越界",
+                                        "id": req_id
+                                    })).await?;
+                                }
+                            }
+                            _ => {
+                                send_json(&mut writer, &serde_json::json!({
+                                    "type":"clipboard_data",
+                                    "content_type":"error",
+                                    "message":"剪贴板内容已变化或不可用",
+                                    "id": req_id
+                                })).await?;
+                            }
+                        }
+                    }
+                    _ => {
+                        send_json(&mut writer, &serde_json::json!({
+                            "type":"clipboard_data",
+                            "content_type":"error",
+                            "message": format!("不支持的内容类型: {}", content_type),
+                            "id": req_id
                         })).await?;
                     }
                 }
