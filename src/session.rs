@@ -132,6 +132,32 @@ pub async fn handle(
             "ping" => {
                 send_json(&mut writer, &serde_json::json!({"type":"pong"})).await?;
             }
+            "key" => {
+                let key = msg.get("key").and_then(|v| v.as_str()).unwrap_or("");
+                let id = msg.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                if key != "enter" {
+                    send_json(&mut writer, &serde_json::json!({
+                        "type":"nack","id":id,"status":"unsupported_key",
+                        "message":format!("不支持按键: {}", key)
+                    })).await?;
+                    continue;
+                }
+                tracing::info!("[{}] key: enter", addr);
+                match paste::simulate_enter() {
+                    Ok(()) => {
+                        tracing::info!("[{}] enter sent", addr);
+                        send_json(&mut writer, &serde_json::json!({
+                            "type":"ack","id":id,"status":"sent"
+                        })).await?;
+                    }
+                    Err(e) => {
+                        send_json(&mut writer, &serde_json::json!({
+                            "type":"nack","id":id,"status":"error",
+                            "message":format!("发送回车失败: {}", e)
+                        })).await?;
+                    }
+                }
+            }
             _ => {}
         }
     }

@@ -142,6 +142,9 @@ systemctl --user enable --now cliplinkd.service
 | 手机→电脑 | `{"type":"send","payload":"...","id":"uuid"}` | 发送文本 |
 | 电脑→手机 | `{"type":"ack","id":"uuid","status":"sent"}` | 已发送 |
 | 电脑→手机 | `{"type":"nack","id":"uuid","status":"error","message":"..."}` | 发送失败 |
+| 手机→电脑 | `{"type":"key","key":"enter","id":"uuid"}` | 发送按键（目前仅支持 enter） |
+| 电脑→手机 | `{"type":"ack","id":"uuid","status":"sent"}` | 按键已执行 |
+| 电脑→手机 | `{"type":"nack","id":"uuid","status":"error","message":"..."}` | 按键执行失败 |
 | 手机→电脑 | `{"type":"ping"}` | 心跳 |
 | 电脑→手机 | `{"type":"pong"}` | 心跳响应 |
 

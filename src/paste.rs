@@ -20,3 +20,10 @@ pub fn simulate_paste() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// Simulate pressing the Enter/Return key.
+pub fn simulate_enter() -> anyhow::Result<()> {
+    let mut enigo = Enigo::new();
+    enigo.key_click(Key::Return);
+    Ok(())
+}
