@@ -1,10 +1,11 @@
 # ClipLink Daemon
 
-**`cliplinkd`** — 桌面端守护进程，接收来自手机 ClipLink APP 的文本，自动写入剪贴板并粘贴。
+**`cliplinkd`** — 桌面端守护进程，接收来自手机 ClipLink APP 的文本、图片和文件，写入系统剪贴板并自动粘贴。
 
 ## 特性
 
 - **剪贴板拉取**：手机一键获取电脑剪贴板内容（文本/图片/文件），支持大文件确认和进度条
+- **手机附件发送**：图片直接写入剪贴板；普通文件安全缓存后作为文件引用写入剪贴板
 - **多播发现**：224.0.0.167 多播 + Burst 首发，手机自动发现，无需手动输入 IP
 - **PIN 认证**：可选的 PIN 码保护，3 次失败后自动封禁 IP 30 秒
 - **后台运行**：`cliplinkd start` / `stop` 一键启停，不占用终端窗口
@@ -71,8 +72,10 @@ pin = "123456"       # PIN 码；留空则跳过认证
 name = "My Computer" # 手机端显示的设备名，默认取 hostname
 
 [clipboard]
-max_fetch_size = 524288  # 文本自动获取阈值（字节），超过此大小需确认；默认 512KB
+max_fetch_size = 524288       # 文本自动获取阈值（字节），超过此大小需确认；默认 512KB
+max_receive_size = 1073741824 # 手机单个附件的接收上限（字节）；默认 1GB
 ```
+
 ## 运行
 
 ```bash
@@ -139,20 +142,30 @@ systemctl --user enable --now cliplinkd.service
 | 方向 | 消息 | 说明 |
 |------|------|------|
 | 手机→电脑 | `{"type":"auth","pin":"...","device_name":"..."}` | 认证 |
-| 电脑→手机 | `{"type":"auth_ok","name":"..."}` | 认证成功（含设备名） |
+| 电脑→手机 | `{"type":"auth_ok","name":"...","capabilities":[...]}` | 认证成功；新版服务含 `upload-v1` 能力 |
 | 电脑→手机 | `{"type":"auth_fail","name":"...","message":"..."}` | 认证失败（含设备名） |
 | 手机→电脑 | `{"type":"send","payload":"...","id":"uuid"}` | 发送文本 |
 | 电脑→手机 | `{"type":"ack","id":"uuid","status":"sent"}` | 已发送 |
 | 电脑→手机 | `{"type":"nack","id":"uuid","status":"error","message":"..."}` | 发送失败 |
 | 手机→电脑 | `{"type":"key","key":"enter","id":"uuid"}` | 发送按键（目前仅支持 enter） |
-| 电脑→手机 | `{"type":"ack","id":"uuid","status":"sent"}` | 按键已执行 |
-| 电脑→手机 | `{"type":"nack","id":"uuid","status":"error","message":"..."}` | 按键执行失败 |
+| 手机→电脑 | `{"type":"upload_begin","id":"uuid","kind":"image\|file","filename":"...","size_bytes":123}` | 开始单个附件上传 |
+| 电脑→手机 | `{"type":"upload_ready","id":"uuid","chunk_size":49152}` | 服务端允许上传 |
+| 手机→电脑 | `{"type":"upload_chunk","id":"uuid","seq":0,"payload_base64":"..."}` | 单块数据；发送下一块前必须等待确认 |
+| 电脑→手机 | `{"type":"upload_chunk_ack","id":"uuid","seq":0,"received_bytes":123}` | 数据块确认与进度 |
+| 手机→电脑 | `{"type":"upload_finish","id":"uuid","size_bytes":123,"sha256":"..."}` | 完成上传并校验完整性 |
+| 手机→电脑 | `{"type":"upload_cancel","id":"uuid"}` | 取消上传 |
 | 手机→电脑 | `{"type":"ping"}` | 心跳 |
 | 电脑→手机 | `{"type":"pong"}` | 心跳响应 |
 | 手机→电脑 | `{"type":"clipboard_query"}` | 查询电脑剪贴板 |
 | 电脑→手机 | `{"type":"clipboard_info","content_type":"text\|image\|file\|none",...}` | 剪贴板内容信息 |
 | 手机→电脑 | `{"type":"clipboard_fetch","content_type":"text\|image\|file",...}` | 请求获取内容 |
 | 电脑→手机 | `{"type":"clipboard_data","content_type":"text\|image\|file","payload_base64":"...",...}` | 返回内容数据 |
+
+## 手机附件接收
+
+- **图片**：目前支持 PNG / JPEG；解码后直接写入系统图片剪贴板，不保存图片副本。
+- **普通文件**：写入系统缓存目录 `cliplinkd/uploads`，再将本地文件引用放入剪贴板。过期 7 天的缓存会在下一次附件上传前清理，以保证稍后粘贴仍有效。
+- 传输按 48KB 原始数据块串行确认，服务端校验顺序、大小与 SHA-256；取消、断线或校验失败会删除未完成文件。
 
 ## 许可
 

@@ -6,6 +6,7 @@ mod discovery;
 mod paste;
 mod server;
 mod session;
+mod upload;
 
 use std::io::{self, Write};
 use tracing_subscriber::EnvFilter;
@@ -34,18 +35,14 @@ async fn run_daemon() -> anyhow::Result<()> {
     // Initialize structured logging
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info")),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .with_target(false)
         .init();
 
     let config = config::Config::load()?;
 
-    tracing::info!(
-        "ClipLink daemon v{} starting",
-        env!("CARGO_PKG_VERSION")
-    );
+    tracing::info!("ClipLink daemon v{} starting", env!("CARGO_PKG_VERSION"));
     tracing::info!(
         "Service name: \"{}\", listening on {}:{}",
         config.service.name,
@@ -53,7 +50,9 @@ async fn run_daemon() -> anyhow::Result<()> {
         config.server.port
     );
     if config.auth.pin.is_empty() {
-        tracing::warn!("No PIN configured — run 'cliplinkd init' to set one, or any device can connect");
+        tracing::warn!(
+            "No PIN configured — run 'cliplinkd init' to set one, or any device can connect"
+        );
     }
 
     let disc_config = config.clone();
@@ -171,8 +170,19 @@ fn run_init() -> anyhow::Result<()> {
     println!();
     println!("  ──────────────────────────────────");
     println!("  Service name : {}", config.service.name);
-    println!("  PIN          : {}", if config.auth.pin.is_empty() { "(none — insecure!)" } else { &config.auth.pin });
-    println!("  TCP port     : {} (UDP discovery: {})", config.server.port, config.server.port + 1);
+    println!(
+        "  PIN          : {}",
+        if config.auth.pin.is_empty() {
+            "(none — insecure!)"
+        } else {
+            &config.auth.pin
+        }
+    );
+    println!(
+        "  TCP port     : {} (UDP discovery: {})",
+        config.server.port,
+        config.server.port + 1
+    );
     println!("  ──────────────────────────────────");
     println!();
 

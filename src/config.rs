@@ -27,23 +27,30 @@ pub struct AuthConfig {
     pub pin: String,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClipboardConfig {
     /// Max auto-fetch size in bytes. Text below this threshold is fetched
     /// without confirmation. Images and files always require confirmation.
     #[serde(default = "default_max_fetch_size")]
     pub max_fetch_size: usize,
+    /// Maximum size in bytes accepted from a paired mobile device per upload.
+    #[serde(default = "default_max_receive_size")]
+    pub max_receive_size: usize,
 }
 
 fn default_max_fetch_size() -> usize {
     524288 // 512 KB
 }
 
+fn default_max_receive_size() -> usize {
+    1024 * 1024 * 1024 // 1 GB
+}
+
 impl Default for ClipboardConfig {
     fn default() -> Self {
         Self {
             max_fetch_size: default_max_fetch_size(),
+            max_receive_size: default_max_receive_size(),
         }
     }
 }
@@ -79,9 +86,7 @@ impl Default for ServerConfig {
 
 impl Default for AuthConfig {
     fn default() -> Self {
-        Self {
-            pin: String::new(),
-        }
+        Self { pin: String::new() }
     }
 }
 
@@ -109,9 +114,7 @@ impl Config {
     fn config_dir() -> PathBuf {
         #[cfg(target_os = "windows")]
         {
-            dirs::config_dir()
-                .unwrap_or_default()
-                .join("cliplinkd")
+            dirs::config_dir().unwrap_or_default().join("cliplinkd")
         }
         #[cfg(not(target_os = "windows"))]
         {
@@ -134,12 +137,10 @@ impl Config {
 
         for path in &paths {
             if path.exists() {
-                let content = std::fs::read_to_string(path).with_context(|| {
-                    format!("Failed to read config from {}", path.display())
-                })?;
-                let config: Config = toml::from_str(&content).with_context(|| {
-                    format!("Failed to parse config from {}", path.display())
-                })?;
+                let content = std::fs::read_to_string(path)
+                    .with_context(|| format!("Failed to read config from {}", path.display()))?;
+                let config: Config = toml::from_str(&content)
+                    .with_context(|| format!("Failed to parse config from {}", path.display()))?;
                 tracing::info!("Loaded config from {}", path.display());
                 return Ok(config);
             }
