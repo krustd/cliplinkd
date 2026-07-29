@@ -33,8 +33,7 @@ pub struct FileEntry {
 /// Read the current system clipboard content.
 /// Priority: text → image → files → none.
 pub fn read() -> anyhow::Result<ClipboardContent> {
-    let mut clipboard =
-        arboard::Clipboard::new().context("Failed to open system clipboard")?;
+    let mut clipboard = arboard::Clipboard::new().context("Failed to open system clipboard")?;
 
     // 1. Try files first — on macOS, file clipboard also exposes a text
     //    representation (the filename), so we must check files before text.
@@ -69,8 +68,8 @@ pub fn encode_rgba_to_png(width: usize, height: usize, rgba: &[u8]) -> anyhow::R
     let w = u32::try_from(width).context("image width overflow")?;
     let h = u32::try_from(height).context("image height overflow")?;
 
-    let img = image::RgbaImage::from_raw(w, h, rgba.to_vec())
-        .context("Invalid RGBA image dimensions")?;
+    let img =
+        image::RgbaImage::from_raw(w, h, rgba.to_vec()).context("Invalid RGBA image dimensions")?;
 
     let mut png_bytes = Vec::new();
     let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
@@ -121,8 +120,7 @@ fn read_files_macos() -> anyhow::Result<Vec<FileEntry>> {
 
     unsafe {
         // NSPasteboard *pb = [NSPasteboard generalPasteboard];
-        let pb: Retained<AnyObject> =
-            msg_send![objc2::class!(NSPasteboard), generalPasteboard];
+        let pb: Retained<AnyObject> = msg_send![objc2::class!(NSPasteboard), generalPasteboard];
 
         // NSMutableArray *classes = [NSMutableArray arrayWithObject:[NSURL class]];
         let nsurl_class: &objc2::runtime::AnyClass = objc2::class!(NSURL);
@@ -253,9 +251,7 @@ fn url_decode(s: &str) -> String {
 #[cfg(target_os = "windows")]
 fn read_files_windows() -> anyhow::Result<Vec<FileEntry>> {
     use windows::core::PWSTR;
-    use windows::Win32::System::DataExchange::{
-        CloseClipboard, GetClipboardData, OpenClipboard,
-    };
+    use windows::Win32::System::DataExchange::{CloseClipboard, GetClipboardData, OpenClipboard};
     use windows::Win32::UI::Shell::{DragQueryFileW, CF_HDROP, HDROP};
 
     unsafe {
@@ -265,8 +261,7 @@ fn read_files_windows() -> anyhow::Result<Vec<FileEntry>> {
         }
 
         let result = (|| -> anyhow::Result<Vec<FileEntry>> {
-            let handle = GetClipboardData(CF_HDROP.0 as u32)
-                .context("No CF_HDROP on clipboard")?;
+            let handle = GetClipboardData(CF_HDROP.0 as u32).context("No CF_HDROP on clipboard")?;
 
             let hdrop = HDROP(handle.0);
             // Pass 0xFFFFFFFF as file index to get the count
@@ -278,11 +273,7 @@ fn read_files_windows() -> anyhow::Result<Vec<FileEntry>> {
                 let len = DragQueryFileW(hdrop, i, None) as usize;
                 let mut buf = vec![0u16; len + 1];
                 // Second call to get the path
-                DragQueryFileW(
-                    hdrop,
-                    i,
-                    Some(PWSTR::from_raw(buf.as_mut_ptr())),
-                );
+                DragQueryFileW(hdrop, i, Some(PWSTR::from_raw(buf.as_mut_ptr())));
                 let path_str = String::from_utf16_lossy(&buf[..len])
                     .trim_end_matches('\0')
                     .to_string();

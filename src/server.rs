@@ -14,8 +14,7 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
     tracing::info!("TCP server listening on {}", addr);
 
     let config = Arc::new(config);
-    let banned: Arc<Mutex<HashMap<SocketAddr, Instant>>> =
-        Arc::new(Mutex::new(HashMap::new()));
+    let banned: Arc<Mutex<HashMap<SocketAddr, Instant>>> = Arc::new(Mutex::new(HashMap::new()));
 
     loop {
         let (stream, addr) = match listener.accept().await {

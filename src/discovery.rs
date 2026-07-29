@@ -80,7 +80,10 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         // Settle into periodic announcements
         loop {
             tokio::time::sleep(Duration::from_secs(5)).await;
-            if let Err(e) = announce_socket.send_to(&broadcast_bytes, &broadcast_target).await {
+            if let Err(e) = announce_socket
+                .send_to(&broadcast_bytes, &broadcast_target)
+                .await
+            {
                 tracing::warn!("Failed to multicast announcement: {}", e);
             } else {
                 tracing::debug!("Sent announcement to {}", broadcast_target);

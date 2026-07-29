@@ -94,14 +94,11 @@ pub fn kill_process(pid: u32) -> anyhow::Result<()> {
     #[cfg(target_os = "windows")]
     {
         use windows::Win32::Foundation::CloseHandle;
-        use windows::Win32::System::Threading::{
-            OpenProcess, TerminateProcess, PROCESS_TERMINATE,
-        };
+        use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
         unsafe {
-            let handle = OpenProcess(PROCESS_TERMINATE, false, pid)
-                .context("Failed to open process")?;
-            TerminateProcess(handle, 0)
-                .context("Failed to terminate process")?;
+            let handle =
+                OpenProcess(PROCESS_TERMINATE, false, pid).context("Failed to open process")?;
+            TerminateProcess(handle, 0).context("Failed to terminate process")?;
             let _ = CloseHandle(handle);
         }
         Ok(())
